@@ -1,10 +1,10 @@
 ﻿@page "/"
 @using System.Timers
 
-
 <style>
     .container {
         width: 400px;
+        margin-top: 20px;
     }
 
     button {
@@ -16,21 +16,31 @@
 
 <div class="container">
     <div class="row">
-        @*
-        Entendi porque ele colocou col-3 é porque ele vai quebrar em 4 pedaços, já que
-        o grid tem 12 cols
-        *@
-        @for(var animalNumber = 0; animalNumber < shuffledAnimals.Count; animalNumber++)
+        <h1>Find The Animals</h1>
+        @for (var animalNumber = 0; animalNumber < shuffledAnimals.Count; animalNumber++)
         {
-            var animal = shuffledAnimals[animalNumber];
-            var uniqueDescription = $"Button #{animalNumber}";
+            var index = animalNumber;
+            var animalDessaPosicao = shuffledAnimals[index];
+
             <div class="col-3">
-                <button type="button" @onclick="@(()=>ButtonClick(animal,uniqueDescription))" class="btn btn-outline-dark">
-                    <h1>@animal</h1>
+                <button type="button" @onclick="@(() => ButtonClick(animalDessaPosicao, index))"
+                    class="btn btn-outline-dark">
+                    <h1>@foundedAnimals[index]</h1>
                 </button>
             </div>
         }
     </div>
+    <div class="row mt-3 justify-content-between">
+        <div class="col-3">
+            <button @onclick="@(()=>SetUpGame())" style="width:100px;" type="button" class="btn btn-dark">Reiniciar</button>
+        </div>
+        <div class="col-3">
+            <button @onclick="@(()=>PausarGame())" type="button"style="width:100px;" class="btn btn-dark">@pausar</button>
+        </div>
+    </div>
+        <div class="row">
+            <h2>Melhor Tempo:@menorTempo</h2>
+        </div>
     <div class="row">
         <h2>Matches Found: @matchesFound</h2>
     </div>
@@ -39,78 +49,142 @@
     </div>
 </div>
 
-
 @code {
-    List<string> animalEmoji = new List<string>(){
-"🐶","🐶",
-"🐺","🐺",
-"🐮","🐮",
-"🦊","🦊",
-"🐱","🐱",
-"🦁","🦁",
-"🐯","🐯",
-"🐭","🐭",
+    string menorTempo = string.Empty;
+    string pausar = "Pausar";
+    bool gameStarted = false;
+    List<string> animalEmoji = new List<string>() {
+"🐶","🐶", "🐺","🐺", "🐮","🐮", "🦊","🦊",
+"🐱","🐱", "🦁","🦁", "🐯","🐯", "🐭","🐭",
 };
-
+    bool isProcessing = false;
     List<string> shuffledAnimals = new List<string>();
+    List<string> foundedAnimals = new List<string>();
+
     int matchesFound = 0;
-//garanto que vou dar um valor pra ele quando eu for usar.    
     Timer timer = default!;
-    int tenthsOfSecondElapsed =0;
-    string timeDisplay = string.Empty;
+    int tenthsOfSecondElapsed = 0;
+    string timeDisplay = "0.0s";
+
+    string lastAnimalFound = string.Empty;
+    int lastIndexFound = -1;
+
     protected override void OnInitialized()
     {
-    timer = new Timer(100);
-    timer.Elapsed += Timer_Tick;
+        // Configuração do Timer com intervalo de 100ms
+        timer = new Timer(100);
+        timer.Elapsed += Timer_Tick;
         SetUpGame();
     }
 
     private void SetUpGame()
     {
         Random random = new Random();
+
+        // Embaralha os animais usando um número aleatório para cada item
         shuffledAnimals = animalEmoji
         .OrderBy(item => random.Next())
         .ToList();
+
+        // Inicializa a lista de exibição com espaços vazios
+        foundedAnimals = shuffledAnimals
+        .Select(a => string.Empty)
+        .ToList();
+
         matchesFound = 0;
         tenthsOfSecondElapsed = 0;
+        lastAnimalFound = string.Empty;
+        lastIndexFound = -1;
+        timer.Stop();
+        gameStarted = false;
+        timeDisplay = "0.0s";
+
     }
 
-    string lastAnimalFound = string.Empty;
-    string lastDescription = string.Empty;
-    private void ButtonClick(string animal, string animalDescription){
-        if(lastAnimalFound == string.Empty){
-            //primeira seleção do animal
-            lastAnimalFound = animal;
-            lastDescription = animalDescription;
+    private async void ButtonClick(string animal, int index)
+    {
+        if (!gameStarted)
+        {
             timer.Start();
-            
-        }else if((lastAnimalFound == animal) && (lastDescription != animalDescription)){
-            //combinação encontrada
-            lastAnimalFound = string.Empty;
+            gameStarted = true;
+        }
 
-            //Substitua animais encontrados por uma string vazia e oculte-os
-            shuffledAnimals = shuffledAnimals
-            .Select(a=>a.Replace(animal, string.Empty))
-            .ToList();
+        // Se estiver processando um erro, já estiver descoberto ou for o mesmo botão: TRAVA
+        if (isProcessing || foundedAnimals[index] != string.Empty || lastIndexFound == index)
+        {
+            return;
+        }
+
+        foundedAnimals[index] = animal;
+
+        if (lastAnimalFound == string.Empty)
+        {
+            lastAnimalFound = animal;
+            lastIndexFound = index;
+        }
+        else if (lastAnimalFound == animal)
+        {
+            lastAnimalFound = string.Empty;
+            lastIndexFound = -1;
             matchesFound++;
-            if(matchesFound == 8){
-                timer.Stop();
-                timeDisplay += " - Play Again?";
 
-                SetUpGame();
+            if (matchesFound == 8)
+            {
+                timer.Stop();
+
+                if(menorTempo == string.Empty){
+                    menorTempo = timeDisplay;
+                }
+                
+                float tempoAtual = float.Parse(timeDisplay.Replace("s",""));
+                float recordeAtual = float.Parse(menorTempo.Replace("s",""));
+                menorTempo = tempoAtual<recordeAtual
+                ?timeDisplay
+                :menorTempo;
+                timeDisplay += " - Play Again?";
             }
-        }else{
-            //usuario selecionou um par que não combina.
-            //redefina a seleção
+        }
+        else
+        {
+            // ATENÇÃO AQUI: Começamos o bloqueio
+            isProcessing = true;
+
+            StateHasChanged();
+            await Task.Delay(700);
+
+            foundedAnimals[index] = string.Empty;
+            foundedAnimals[lastIndexFound] = string.Empty;
+
             lastAnimalFound = string.Empty;
+            lastIndexFound = -1;
+
+            // Fim do bloqueio: agora o usuário pode clicar de novo
+            isProcessing = false;
+        }
+
+        StateHasChanged();
+    }
+    private void PausarGame(){
+        if(!gameStarted || matchesFound == 8){
+            return;
+        }
+        if(pausar == "Pausar"){
+            pausar = "Retomar";
+            isProcessing = true;
+            timer.Stop();
+        }else{
+            isProcessing = false;
+            pausar = "Pausar";
+            timer.Start();
         }
     }
 
-    private void Timer_Tick(Object? source, ElapsedEventArgs e){
-        InvokeAsync(()=>{
+    private void Timer_Tick(object? source, ElapsedEventArgs e)
+    {
+        InvokeAsync(() =>
+        {
             tenthsOfSecondElapsed++;
-            timeDisplay = (tenthsOfSecondElapsed / 10F)
-            .ToString("0.00s");
+            timeDisplay = (tenthsOfSecondElapsed / 10F).ToString("0.0s");
             StateHasChanged();
         });
     }
