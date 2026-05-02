@@ -53,14 +53,15 @@
     string menorTempo = string.Empty;
     string pausar = "Pausar";
     bool gameStarted = false;
-    List<string> animalEmoji = new List<string>() {
-"🐶","🐶", "🐺","🐺", "🐮","🐮", "🦊","🦊",
-"🐱","🐱", "🦁","🦁", "🐯","🐯", "🐭","🐭",
-};
+    List<string> armazenamentoAnimais = new List<string>(){
+"🐶","🐸", "🐨","🐺", "🦇","🐮", "🦉","🦊",
+"🐱","🦟", "🦁","🦕", "🐯","🦈", "🐋","🐭",
+    };
+    List<string> animalEmoji = new List<string>();
     bool isProcessing = false;
     List<string> shuffledAnimals = new List<string>();
     List<string> foundedAnimals = new List<string>();
-
+    
     int matchesFound = 0;
     Timer timer = default!;
     int tenthsOfSecondElapsed = 0;
@@ -80,6 +81,12 @@
     private void SetUpGame()
     {
         Random random = new Random();
+        var selecionados = armazenamentoAnimais
+        .OrderBy(a=>random.Next())
+        .Take(8)
+        .ToList();
+
+        animalEmoji = selecionados.Concat(selecionados).ToList();
 
         // Embaralha os animais usando um número aleatório para cada item
         shuffledAnimals = animalEmoji
